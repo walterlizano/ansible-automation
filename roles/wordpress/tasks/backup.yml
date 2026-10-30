@@ -1,0 +1,9 @@
+---
+- name: "Setting the borgmatic snippet path and name"
+  ansible.builtin.set_fact:
+    borgmatic_snippet_file: "{{ role_path }}/files/wordpress.yaml"
+    borgmatic_snippet_name: wordpress
+
+- name: Setup borgmatic wordpress backup
+  ansible.builtin.include_role:
+    name: borgmatic_snippet

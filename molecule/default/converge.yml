@@ -8,6 +8,11 @@
         deployment_is_dev: true
       tags: ["always"]  # Otherwise tagged converges would treat the VMs as prod
 
+    - name: "Point the wireguard endpoint at the VM, not the production host"
+      ansible.builtin.set_fact:
+        wireguard_endpoint_host: "{{ ansible_host }}"
+      tags: ["always"]
+
 - name: Execute the root playbook
   ansible.builtin.import_playbook: "{{ lookup('env', 'MOLECULE_PROJECT_DIRECTORY') }}/playbook.yml"
 

@@ -6,7 +6,7 @@ ListenPort = {{ wireguard_endpoint_port }}
 {% for host in groups['all'] if hostvars[host].wireguard_type == "endpoint" %}
 [Peer]  # {{ host }}
 PublicKey = {{ hostvars[host].wireguard_public_key }}
-EndPoint = {{ hostvars[host].ansible_host }}:{{ hostvars[host].wireguard_endpoint_port }}
+EndPoint = {{ hostvars[host].wireguard_endpoint_host }}:{{ hostvars[host].wireguard_endpoint_port }}
 AllowedIPs = {{ hostvars[host].wireguard_allowed_ips }}
 PersistentKeepalive = 25
 

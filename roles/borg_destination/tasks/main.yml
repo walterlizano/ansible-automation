@@ -7,8 +7,18 @@
         name: borg
         home: /srv/borg
 
+    # The user module only sets ownership on a home it creates itself, and on
+    # hosts using the borg_storage role /srv/borg already exists as the mount
+    # point's filesystem root, owned by root.
+    - name: Set the borg home ownership
+      ansible.builtin.file:
+        path: /srv/borg
+        state: directory
+        owner: borg
+        group: borg
+        mode: "0700"
+
     - name: Install borg packages
       ansible.builtin.apt:
         pkg:
           - borgbackup
-

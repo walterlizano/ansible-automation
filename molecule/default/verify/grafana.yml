@@ -1,6 +1,6 @@
 ---
-# Only the grafana vsite is checked: the rest of the observability stack on
-# the webserver is temporary, only the reverse proxy stays.
+# Checked from the webserver: grafana runs on the grafana host, and the
+# webserver's caddy reverse proxies it through the wireguard network.
 
 - name: Grafana
   block:

@@ -1,5 +1,10 @@
 ---
 borg_passphrase: "{{ vault_borg_passphrase }}"
+# Second 300 GB SSD (/dev/sdb1 at the time of writing), dedicated to the
+# borg repositories.
+borg_storage_uuid: e147d65c-7a50-4c70-b245-6df61b47e24b
+ssh_host_private_ed25519_key: "{{ vault_ssh_host_private_ed25519_key }}"
+ssh_host_public_ed25519_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAbyaB9DI9OzpKQwOLPP/9lFdc5kbMYLMrhpEx9mG63h root@srv1"
 wireguard_type: client
 wireguard_address: 192.168.211.60
 wireguard_private_key: "{{ vault_wireguard_private_key }}"

@@ -1,0 +1,8 @@
+---
+- name: Register grafana caddy file
+  become: true
+  ansible.builtin.template:
+    src: grafana.caddy.j2
+    dest: /etc/caddy/sites.d/grafana.caddy
+    mode: u=rw,g=r,o=r
+  notify: caddy changed

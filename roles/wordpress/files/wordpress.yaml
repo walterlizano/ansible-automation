@@ -1,0 +1,5 @@
+source_directories:
+    - /srv/www/wordpress.epicerieledetour.org/wp-content
+
+mariadb_databases:
+    - name: wordpress

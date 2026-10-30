@@ -1,0 +1,21 @@
+[Unit]
+Description=Mattermost
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+Type=notify
+User=mattermost
+Group=mattermost
+EnvironmentFile={{ mattermost_env_file }}
+WorkingDirectory={{ mattermost_install_dir }}/current
+ExecStart={{ mattermost_install_dir }}/current/bin/mattermost
+# Database migrations run before the server reports ready
+TimeoutStartSec=3600
+KillMode=mixed
+Restart=always
+RestartSec=10
+LimitNOFILE=49152
+
+[Install]
+WantedBy=multi-user.target

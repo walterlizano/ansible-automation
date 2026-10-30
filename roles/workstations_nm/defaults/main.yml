@@ -1,0 +1,3 @@
+---
+# Bring the wireguard connection up automatically
+workstations_nm_autoconnect: true

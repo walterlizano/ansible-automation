@@ -1,0 +1,17 @@
+---
+- name: Wireguard through NetworkManager
+  become: true
+  block:
+    - name: Install wireguard-tools
+      ansible.builtin.package:
+        name: wireguard-tools
+        state: present
+
+    - name: Instanciate NetworkManager connection wg-ledetour.nmconnection
+      ansible.builtin.template:
+        src: wg-ledetour.nmconnection.j2
+        dest: /etc/NetworkManager/system-connections/wg-ledetour.nmconnection
+        owner: root
+        group: root
+        mode: u=rw,g=,o=
+      notify: networkmanager connection changed

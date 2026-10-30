@@ -1,0 +1,35 @@
+---
+# Restoring under a running mattermost would fail on its open database
+# connections, and mix restored and live files
+- name: Stop mattermost before restoring
+  become: true
+  ansible.builtin.systemd:
+    name: mattermost
+    state: stopped
+  when: "'borgmatic_restore' in ansible_run_tags"
+  tags:
+    - never
+    - borgmatic_restore
+
+- name: "Setting the borgmatic snippet path and name"
+  ansible.builtin.set_fact:
+    borgmatic_snippet_file: "{{ role_path }}/files/mattermost.yaml"
+    borgmatic_snippet_name: mattermost
+
+- name: Setup borgmatic mattermost backup
+  ansible.builtin.include_role:
+    name: borgmatic_snippet
+  vars:
+    # The attachments and config.json, next to the database
+    borgmatic_snippet_extract_paths:
+      - "{{ mattermost_root_dir }}"
+
+- name: Start mattermost after restoring
+  become: true
+  ansible.builtin.systemd:
+    name: mattermost
+    state: started
+  when: "'borgmatic_restore' in ansible_run_tags"
+  tags:
+    - never
+    - borgmatic_restore

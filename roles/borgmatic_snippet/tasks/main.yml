@@ -29,11 +29,27 @@
         cmd: "borgmatic --config {{ borgmatic_snippet_config }} create"
       when: "'borgmatic_create' in ansible_run_tags"
       tags:
+        - never
         - borgmatic_create
+
+    # restore only brings the databases back: snippets list the folders to
+    # extract in borgmatic_snippet_extract_paths
+    - name: "Extract last backup files {{ borgmatic_snippet_name }}"
+      ansible.builtin.command:
+        cmd: >-
+          borgmatic --config {{ borgmatic_snippet_config }} extract --archive latest --destination /
+          {% for path in borgmatic_snippet_extract_paths %} --path {{ path | regex_replace('^/', '') }}{% endfor %}
+      when:
+        - "'borgmatic_restore' in ansible_run_tags"
+        - borgmatic_snippet_extract_paths | default([]) | length > 0
+      tags:
+        - never
+        - borgmatic_restore
 
     - name: "Restore last backup {{ borgmatic_snippet_name }}"
       ansible.builtin.command:
         cmd: "borgmatic --config {{ borgmatic_snippet_config }} restore --archive latest"
       when: "'borgmatic_restore' in ansible_run_tags"
       tags:
+        - never
         - borgmatic_restore 

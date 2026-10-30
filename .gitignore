@@ -1,6 +1,7 @@
 # Project specific
 wg-ledetour.conf-*
 *.qcow2
+tmp_migration/
 
 # Vagrant
 .ssh.config

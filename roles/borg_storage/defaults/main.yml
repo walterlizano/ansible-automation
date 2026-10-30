@@ -1,0 +1,8 @@
+---
+# UUID of the filesystem dedicated to the borg repositories. Set it per host
+# (see host_vars/srv1/vars.yml). Left empty the role is a no-op, so hosts
+# without a dedicated disk keep their repositories on the root filesystem.
+borg_storage_uuid: ""
+borg_storage_path: /srv/borg
+borg_storage_fstype: ext4
+borg_storage_opts: defaults,nofail,noatime,x-systemd.device-timeout=10

@@ -10,8 +10,9 @@ newgrp libvirt
 ## Backups / restore
 
 ```bash
-uv run molecule converge -- --tag vouchers --tags borgmatic_create
-uv run molecule converge -- --tag vouchers --tags borgmatic_restore
+uv run molecule converge -- --tags vouchers --tags borgmatic_create
+uv run molecule converge -- --tags vouchers --tags borgmatic_restore
+uv run molecule converge -- --tags wordpress --tags borgmatic_create
 ```
 
 # ansible-automation
@@ -65,6 +66,110 @@ The Épicerie le Détour is a French speaking organization that is open to the w
 - all internal documentation is written in French
 - as one can't assume the reader's known language, all external documentation and code (including this repository) is written in English
 
+## Infrastructure
+
+### The Wireguard network
+
+Every machine — servers and workstations alike — lives in a single Wireguard
+network, `wg-ledetour`, on the `192.168.211.0/24` subnet, listening on UDP port
+51820. The topology is a strict hub and spoke: `vps2` is the only host with
+`wireguard_type: endpoint` (see `host_vars/vps2/vars.yml`) and every other host
+is a `client` that declares `vps2` as its single peer.
+
+```mermaid
+flowchart LR
+    internet(("Internet"))
+
+    subgraph wg["wg-ledetour &nbsp; 192.168.211.0/24 &nbsp; udp 51820"]
+        direction TB
+        vps2["<b>vps2</b> &nbsp; .90<br/><i>endpoint, routes the whole /24</i>"]
+        srv1["<b>srv1</b> &nbsp; .60"]
+        ws["<b>charles-ws</b> &nbsp; .70<br/><i>systemd-networkd</i>"]
+        lp["<b>charles-lp</b> &nbsp; .40<br/><i>NetworkManager</i>"]
+    end
+
+    internet -->|"vps-53fcb87d.vps.ovh.ca:51820"| vps2
+
+    srv1 -. peer .- vps2
+    ws -. peer .- vps2
+    lp -. peer .- vps2
+```
+
+Two consequences of that shape are worth keeping in mind:
+
+- **Nothing talks peer to peer.** Clients set `AllowedIPs = 192.168.211.0/24`,
+  and `vps2` enables `ip_forward` and accepts `FORWARD` on the interface
+  (`roles/wireguard/templates/wg-ledetour-endpoint.conf.j2`), so traffic between
+  two clients — a workstation reaching `srv1`, for instance — is routed *through*
+  `vps2`. If `vps2` is down, the private network is down with it.
+- **`vps2` is the only host that needs a reachable address.** It is the only
+  machine whose `ansible_host` is a public name; the self-hosted servers are
+  reached at their Wireguard address, which is why the very first production run
+  of a new machine must be pointed at its LAN IP explicitly (see
+  [First setup of a production machine](#first-setup-of-a-production-machine)).
+
+### Services per machine
+
+```mermaid
+flowchart TB
+    internet(("Internet"))
+
+    subgraph vps2["vps2 &nbsp; 192.168.211.90 &nbsp; OVH VPS"]
+        caddy["<b>caddy</b><br/>tcp 443, Let's Encrypt"]
+        wordpress["<b>wordpress</b><br/>mariadb + php-fpm"]
+        vouchers["<b>vouchers</b><br/>sqlite, daily report timer"]
+        membres["<b>membres</b><br/>static json, optional client cert"]
+        borgmatic["<b>borgmatic</b><br/>system, wordpress, vouchers"]
+        agents2["node_exporter tcp 9100<br/>alloy"]
+    end
+
+    subgraph srv1["srv1 &nbsp; 192.168.211.60 &nbsp; self-hosted"]
+        grafana["<b>grafana</b><br/>tcp 3000"]
+        loki["<b>loki</b><br/>tcp 3100"]
+        prometheus["<b>prometheus</b><br/>tcp 9090"]
+        borg["<b>borg repositories</b><br/>/srv/borg, dedicated 300 GB ssd"]
+        agents1["node_exporter tcp 9100<br/>alloy"]
+    end
+
+    internet -->|"epicerieledetour.org<br/>vouchers. &nbsp; membres. &nbsp; grafana."| caddy
+
+    caddy --> wordpress
+    caddy --> vouchers
+    caddy --> membres
+    caddy -->|"reverse_proxy over wireguard"| grafana
+
+    borgmatic -->|"ssh borg@srv1 over wireguard"| borg
+
+    agents2 -->|"logs, over wireguard"| loki
+    agents1 --> loki
+    prometheus -->|"scrape, over wireguard"| agents2
+    prometheus --> agents1
+    grafana --> loki
+    grafana --> prometheus
+```
+
+Grafana is never exposed to the internet directly: it only listens on the
+Wireguard network, and `roles/grafana_proxy` templates a Caddy vsite on the web
+server that reverse-proxies `grafana.epicerieledetour.org` to it. The same holds
+for Loki and Prometheus, which are reachable from the Wireguard network only.
+
+| host | Wireguard IP | inventory groups | what runs on it |
+|---|---|---|---|
+| `vps2` | `192.168.211.90` | `servers`, `webservers`, `vouchers`, `backup_sources` | Wireguard endpoint, caddy, wordpress, vouchers, membres, grafana reverse proxy, borgmatic, node_exporter, alloy, ufw, fail2ban |
+| `srv1` | `192.168.211.60` | `servers`, `grafana`, `backup_destinations` | grafana, loki, prometheus, borg repositories, node_exporter, alloy, ufw, fail2ban |
+| `charles-ws` | `192.168.211.70` | `workstations_networkd` | Wireguard client only, configured through systemd-networkd |
+| `charles-lp` | `192.168.211.40` | `workstations_nm` | Wireguard client only, configured through NetworkManager |
+
+Workstation plays are tagged `never` and run only when explicitly asked for, see
+[Wireguard on workstations](#wireguard-on-workstations).
+
+Some hosts still hold a `host_vars` entry — and therefore a reserved Wireguard
+address — without being part of the active inventory: `vps` (`.10`, the previous
+VPS, being retired in favour of `vps2`, see `TODO.md`), `pi1` (`.30`, a backup
+destination currently commented out of `inventory/groups.yml`), `pi2` (`.20`),
+`mauriandres-workstation` (`.50`) and `kiosk1` (`.80`). Keep those addresses in
+mind before handing one out to a new machine.
+
 ## The Ansible setup
 
 ### The vault password file
@@ -75,6 +180,8 @@ To add a new administrator that could run this ansible setup:
 
 1. Add their ssh public key in the `keys` folder. Keep the same key name on their local workstation `~/.ssh` folder, the vault password decryption script uses this name to find the matching private key. For example, if the new administrator public key is `/home/username/.ssh/id_ed25519.pub`, then copy this key as `keys/username-id_ed25519.pub`
 2. Decrypt the vault password and encrypt it using the new admin public key: `./vault_password.sh | age -R keys/username-id_ed25519.pub -o .vault_password.d/encrypted-vault-password-for-username`
+
+These two steps only give the new administrator the vault password. The `keys` folder is the vault recipient store, not the ssh allowlist: the `authorized_keys` role writes `authorized_keys` exclusively from the names listed in `authorized_keys_allowed` (`group_vars/all/vars.yml`), and removes every other key from the servers. To also give the new administrator a shell on the servers, add their name to that list.
 
 
 ### Install system dependencies
@@ -124,28 +231,16 @@ ansible-galaxy collection install -r requirements.yml
 
 ### Wireguard on workstations
 
-Servers and workstations are linked together by a wireguard network. Run the playbook with the `workstation` tag (which is never ran by default) to generate a sample wg-quick confiugration file. **Do not let this file laying around:** it contains private informations that should only be seen by your workstation `root` only. 
+Servers and workstations are linked together by a wireguard network, `vps2` being the endpoint every other machine connects to. Workstations are never configured by default (their plays are tagged `never`): add the workstation to the `workstations_networkd` or `workstations_nm` group in `inventory/hosts.yml`, set its `wireguard_*` host vars, then run the playbook limited to that workstation with the matching tag:
 
 ```sh
-ansible-playbook playbook.yml --tags workstation
+# systemd-networkd, creates /etc/systemd/network/wg-ledetour.{netdev,network,key}
+ansible-playbook playbook.yml --limit charles-ws --tags workstations_networkd
+# NetworkManager, creates /etc/NetworkManager/system-connections/wg-ledetour.nmconnection
+ansible-playbook playbook.yml --limit charles-lp --tags workstations_nm
 ```
 
-This will create a `wg-ledetour.conf-the-workstation-name` in the same directy as `playbook.yml`. Check the output for ansible for info on how to use that file:
-```
-...
-TASK [wireguard : Wireguard info] ***************************************************************************
-ok: [charles-xps15] => {
-    "msg": [
-        "Created wireguard config file wg-ledetour.conf-charles-xps15",
-        "Install it as root with `mv wg-ledetour.conf-charles-xps15 /etc/wireguard/wg-ledetour.conf`",
-        "Activate wireguard with:",
-        "- Either directly with wg-quick `wg-quick up wg-ledetour`",
-        "- Or with systemd `sysemctl start wg-quick@wg-ledetour.service`",
-        "Don't forget to open your firewall: UDP outbound port 51820"
-    ]
-}
-...
-```
+Workstations are always local machines (`ansible_connection: local` on the `workstations` inventory group): run the playbook on the workstation itself, ansible never connects to them through ssh. Don't forget to rerun the `wireguard` tag on the servers so that `vps2` knows the new peer, and to open your firewall: UDP outbound port 51820.
 
 ## Production mode
 

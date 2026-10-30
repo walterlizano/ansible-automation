@@ -1,0 +1,9 @@
+---
+# Hosts fail2ban never bans. Admin access is expected to come through
+# wireguard, so the wireguard network is the only trusted range here: a
+# bootstrap run happens over the LAN, before wireguard exists, and is
+# deliberately not covered.
+fail2ban_ignoreip:
+  - 127.0.0.1/8
+  - "::1"
+  - 192.168.211.0/24  # wireguard

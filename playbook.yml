@@ -1,20 +1,30 @@
 ---
-- name: "Generate workstation wireguard config"
-  hosts: workstations
-  connection: local
-  vars:
-    group_suffix: "-workstation"
+# Workstations are never configured by default, run for example
+# ansible-playbook playbook.yml --limit charles-ws --tags workstations_networkd
+- name: "Setup workstation wireguard with systemd-networkd"
+  hosts: workstations_networkd
   roles:
-    - role: wireguard
-      tags:
-        - wireguard
-        - workstation
+    - role: workstations_networkd
+      tags: ["workstations_networkd"]
   tags:
     - never
+    - workstation
+
+- name: "Setup workstation wireguard with NetworkManager"
+  hosts: workstations_nm
+  roles:
+    - role: workstations_nm
+      tags: ["workstations_nm"]
+  tags:
+    - never
+    - workstation
 
 - name: "Initial ssh configuration"
   hosts: servers
   roles:
+    # Before authorized_keys: it installs a different key set per deployment.
+    - role: common_facts
+      tags: ["always", "common_facts"]
     - role: authorized_keys
       tags: ["authorized_keys"]
     - role: sshd
@@ -39,6 +49,9 @@
       tags: ["upgrade"]
     - role: ufw
       tags: ["ufw"]
+    # After ufw: its rsyslog gives the sshd jail an /var/log/auth.log to read.
+    - role: fail2ban
+      tags: ["fail2ban"]
     - role: wireguard
       tags: ["wireguard"]
     - role: srv
@@ -49,6 +62,8 @@
 - name: Setup borg repository stores
   hosts: backup_destinations
   roles:
+    - role: borg_storage
+      tags: ["borg_storage"]
     - borg_destination
   tags:
     - backup
@@ -65,6 +80,14 @@
     - backup
     - source
 
+- name: Setup grafana, loki and prometheus, served through the webservers' caddy
+  hosts: grafana
+  roles:
+    - role: systemd_handlers
+    - role: grafana
+      tags: ["grafana"]
+  tags: ["grafana"]
+
 - name: Setup web servers
   hosts: webservers
   roles:
@@ -78,17 +101,27 @@
       tags: ["membres"]
     - role: wordpress
       tags: ['wordpress']
-    - role: prometheus
-      tags: ["prometheus"]
-    - role: grafana
-      tags: ["grafana"]
+    - role: grafana_proxy
+      tags: ["grafana", "grafana_proxy"]
   tags: ['webservers']
 
-- name: Setup node_exporter
+- name: Setup mattermost
+  hosts: mattermost
+  roles:
+    - role: caddy_handlers
+    - role: caddy
+      tags: ["caddy"]
+    - role: mattermost
+      tags: ["mattermost"]
+  tags: ["mattermost"]
+
+- name: Setup monitoring agents
   hosts: servers
   roles:
     - role: node_exporter
       tags: ["node_exporter"]
+    - role: alloy
+      tags: ["alloy"]
 
   # Everything below is the old setup being migrated
 # ---

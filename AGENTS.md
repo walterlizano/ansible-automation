@@ -10,7 +10,7 @@ This repository contains Ansible playbooks and roles for managing the Épicerie 
 - `uv run molecule login --host vps2` - Login to a specific VM
 - `uv run molecule destroy` - Destroy all virtual machines
 - `ansible-playbook playbook.yml` - Run full playbook on production
-- `ansible-playbook playbook.yml --tags workstation` - Generate workstation Wireguard config
+- `ansible-playbook playbook.yml --limit <workstation> --tags workstations_networkd` (or `workstations_nm`) - Configure a workstation Wireguard connection
 - `ansible-vault encrypt/view/decrypt secret.yml` - Manage encrypted files
 
 ## Architecture

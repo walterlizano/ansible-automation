@@ -164,3 +164,7 @@
     owner: caddy
     group: caddy
   notify: caddy changed
+
+- name: Setup backup
+  ansible.builtin.include_tasks:
+    file: backup.yml

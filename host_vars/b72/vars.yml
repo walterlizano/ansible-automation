@@ -1,0 +1,11 @@
+---
+borgmatic_ssh_public_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOxySSjW4JLyc8/kBZEuN5CihCOvi0SCDTTvm8RSuRvR borgmatic@b72"
+borgmatic_ssh_private_key: "{{ vault_borgmatic_ssh_private_key }}"
+ssh_host_private_ed25519_key: "{{ vault_ssh_host_private_ed25519_key }}"
+# Same host key as the Debian 11 b72 it replaces
+ssh_host_public_ed25519_key: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILjZFLLlZ+yBmmqsOmkuN6CzoQAU/GlLA0Fh+osA4X60 root@b72"
+wireguard_type: client
+wireguard_address: 192.168.211.72
+wireguard_private_key: "{{ vault_wireguard_private_key }}"
+wireguard_public_key: "73LcQ2s2O4pn8aWn2QD8lezwty5LKvFAd1qvNF2fkis="
+wireguard_endpoint_port: 51820

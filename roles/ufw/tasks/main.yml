@@ -2,11 +2,10 @@
 - name: Ufw
   become: true
   block:
-    - name: Install ufw and fail2ban
+    - name: Install ufw
       ansible.builtin.apt:
         pkg:
-          - fail2ban
-          - rsyslog  # ufw/auth logging to /var/log/{ufw,auth}.log needs it
+          - rsyslog  # ufw logging to /var/log/ufw.log needs it
           - ufw
 
     - name: Disable all ports but ssh

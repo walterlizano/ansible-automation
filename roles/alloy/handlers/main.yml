@@ -1,0 +1,7 @@
+---
+- name: Reload alloy
+  become: true
+  ansible.builtin.systemd:
+    name: alloy
+    state: restarted
+  listen: alloy changed

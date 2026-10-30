@@ -1,0 +1,7 @@
+---
+# Production: only these people get shell access on the servers. Named after
+# the files in keys/<name>-id_ed25519.pub. Listed explicitly rather than
+# globbed, so adding a public key to keys/ never silently grants prod access.
+# In development every key in keys/ is installed instead, see tasks/main.yml.
+authorized_keys_users:
+  - charles

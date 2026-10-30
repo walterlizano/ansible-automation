@@ -1,0 +1,28 @@
+---
+- name: Alloy
+  become: true
+  block:
+
+    - name: Enable Grafana repo via extrepo
+      ansible.builtin.command:
+        cmd: extrepo enable grafana
+        creates: /etc/apt/sources.list.d/extrepo_grafana.sources
+
+    - name: Install alloy
+      ansible.builtin.apt:
+        pkg:
+          - alloy
+        update_cache: true
+
+    - name: Instanciate alloy config
+      ansible.builtin.template:
+        src: config.alloy.j2
+        dest: /etc/alloy/config.alloy
+        mode: u=rw,g=r,o=r
+      notify: alloy changed
+
+    - name: Start alloy
+      ansible.builtin.systemd:
+        name: alloy
+        enabled: true
+        state: started

@@ -1,5 +1,5 @@
 ---
-- name: Grafana, Loki and Alloy as root
+- name: Grafana, Loki and Prometheus as root
   become: true
   block:
 
@@ -8,12 +8,11 @@
         cmd: extrepo enable grafana
         creates: /etc/apt/sources.list.d/extrepo_grafana.sources
 
-    - name: Install grafana, loki and alloy
+    - name: Install grafana and loki
       ansible.builtin.apt:
         pkg:
           - grafana
           - loki
-          - alloy
         update_cache: true
 
     # Grafana
@@ -90,26 +89,40 @@
         enabled: true
         state: started
 
-    # Alloy
+    # Prometheus
 
-    - name: Instanciate alloy config
-      ansible.builtin.copy:
-        src: alloy-config.alloy
-        dest: /etc/alloy/config.alloy
-        mode: u=rw,g=r,o=r
-      notify: alloy changed
+    - name: Prometheus
+      tags: ["prometheus"]
+      block:
 
-    - name: Start alloy
-      ansible.builtin.systemd:
-        name: alloy
-        enabled: true
-        state: started
+        - name: Install prometheus
+          ansible.builtin.apt:
+            pkg:
+              - prometheus
 
-    # Caddy
+        - name: Instanciate prometheus config
+          ansible.builtin.template:
+            src: prometheus.yml.j2
+            dest: /etc/prometheus/prometheus.yml
+            mode: u=rw,g=r,o=r
+          notify: prometheus changed
 
-    - name: Register grafana caddy file
-      ansible.builtin.copy:
-        src: grafana.caddy
-        dest: /etc/caddy/sites.d/grafana.caddy
-        mode: u=rw,g=r,o=r
-      notify: caddy changed
+        - name: Start prometheus
+          ansible.builtin.systemd:
+            name: prometheus
+            enabled: true
+            state: started
+
+    # Grafana is reached by the webservers' caddy reverse proxy, loki by every
+    # server's alloy. Prometheus is only needed locally by grafana, but opened
+    # too for debugging.
+
+    - name: Open grafana, loki and prometheus ports
+      community.general.ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop:
+        - "3000"  # grafana
+        - "3100"  # loki
+        - "9090"  # prometheus

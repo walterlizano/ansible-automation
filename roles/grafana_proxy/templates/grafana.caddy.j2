@@ -1,0 +1,4 @@
+grafana.epicerieledetour.org, grafana.localhost {
+	# Grafana runs on the grafana host, reached through the wireguard network
+	reverse_proxy {{ hostvars[groups['grafana'] | first].wireguard_address }}:3000
+}

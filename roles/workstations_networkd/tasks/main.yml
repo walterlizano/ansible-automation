@@ -1,0 +1,37 @@
+---
+- name: Wireguard through systemd-networkd
+  become: true
+  block:
+    - name: Install wireguard-tools
+      ansible.builtin.package:
+        name: wireguard-tools
+        state: present
+
+    - name: Instanciate wireguard private key wg-ledetour.key
+      ansible.builtin.copy:
+        content: "{{ wireguard_private_key }}\n"
+        dest: /etc/systemd/network/wg-ledetour.key
+        owner: root
+        group: systemd-network
+        mode: u=r,g=r,o=
+      notify: networkd netdev changed
+
+    - name: Instanciate wireguard netdev wg-ledetour.netdev
+      ansible.builtin.template:
+        src: wg-ledetour.netdev.j2
+        dest: /etc/systemd/network/wg-ledetour.netdev
+        mode: u=rw,g=r,o=r
+      notify: networkd netdev changed
+
+    - name: Instanciate wireguard network wg-ledetour.network
+      ansible.builtin.template:
+        src: wg-ledetour.network.j2
+        dest: /etc/systemd/network/wg-ledetour.network
+        mode: u=rw,g=r,o=r
+      notify: networkd changed
+
+    - name: Start systemd-networkd
+      ansible.builtin.systemd:
+        name: systemd-networkd.service
+        enabled: true
+        state: started

@@ -1,0 +1,20 @@
+# {{ ansible_managed }}
+[NetDev]
+Name=wg-ledetour
+Kind=wireguard
+Description=Le Détour wireguard network
+
+[WireGuard]
+PrivateKeyFile=/etc/systemd/network/wg-ledetour.key
+# Add routes for the peers' AllowedIPs, like wg-quick does
+RouteTable=main
+
+{% for host in groups['all'] if hostvars[host].wireguard_type | default('') == "endpoint" %}
+# {{ host }}
+[WireGuardPeer]
+PublicKey={{ hostvars[host].wireguard_public_key }}
+Endpoint={{ hostvars[host].wireguard_endpoint_host }}:{{ hostvars[host].wireguard_endpoint_port }}
+AllowedIPs={{ hostvars[host].wireguard_allowed_ips }}
+PersistentKeepalive=25
+
+{% endfor %}

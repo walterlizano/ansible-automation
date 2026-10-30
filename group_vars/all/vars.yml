@@ -1,4 +1,5 @@
 ---
+# Google OAuth app, shared by every service using Google auth (wordpress on
+# the webservers, grafana on the grafana hosts).
 google_auth_client_id: 666389311813-bkam02fjjruohg1hb6qt4mc61qf6rhn6.apps.googleusercontent.com
 google_auth_client_secret: "{{ vault_google_auth_client_secret }}"
-ldtvouchers_mail_password: "{{ vault_ldtvouchers_mail_password }}"

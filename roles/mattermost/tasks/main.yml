@@ -1,0 +1,135 @@
+---
+- name: Mattermost
+  become: true
+  block:
+
+    - name: Install PostgreSQL
+      ansible.builtin.apt:
+        update_cache: true
+        pkg:
+          - curl  # For mattermost-import
+          - postgresql
+          - python3-psycopg2  # For the community.postgresql.* modules
+          - rsync  # To copy a mattermost-import bundle in
+
+    - name: Create user mattermost
+      ansible.builtin.user:
+        name: mattermost
+        system: true
+        home: "{{ mattermost_root_dir }}"
+        create_home: false
+        shell: /usr/sbin/nologin
+
+    - name: Make the mattermost folders
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: mattermost
+        group: mattermost
+        mode: "u=rwx,g=rx,o="
+      loop:
+        - "{{ mattermost_root_dir }}"
+        - "{{ mattermost_root_dir }}/config"
+        - "{{ mattermost_root_dir }}/data"
+        - "{{ mattermost_install_dir }}"
+
+- name: Mattermost as postgres
+  become: true
+  become_user: postgres
+  block:
+
+    - name: Create PostgreSQL user mattermost
+      community.postgresql.postgresql_user:
+        name: mattermost
+
+    - name: Create PostgreSQL database mattermost
+      community.postgresql.postgresql_db:
+        name: mattermost
+        owner: mattermost
+        encoding: UTF8
+        template: template0
+
+- name: Mattermost as mattermost
+  become: true
+  become_user: mattermost
+  block:
+
+    - name: "Download mattermost {{ mattermost_version }}"
+      ansible.builtin.get_url:
+        url: "https://releases.mattermost.com/{{ mattermost_version }}/mattermost-team-{{ mattermost_version }}-linux-amd64.tar.gz"
+        dest: "{{ mattermost_install_dir }}/mattermost-team-{{ mattermost_version }}-linux-amd64.tar.gz"
+        checksum: "sha256:{{ mattermost_sha256 }}"
+        mode: "u=rw,g=r,o="
+
+    - name: "Make the installation folder of mattermost {{ mattermost_version }}"
+      ansible.builtin.file:
+        path: "{{ mattermost_install_dir }}/{{ mattermost_version }}"
+        state: directory
+        mode: "u=rwx,g=rx,o="
+
+    # Each version gets its own folder, next to the previous ones. There is
+    # no going back by pointing current at an older one: mattermost migrates
+    # the database on start, restore a backup instead
+    - name: "Extract mattermost {{ mattermost_version }}"
+      ansible.builtin.unarchive:
+        src: "{{ mattermost_install_dir }}/mattermost-team-{{ mattermost_version }}-linux-amd64.tar.gz"
+        dest: "{{ mattermost_install_dir }}/{{ mattermost_version }}"
+        remote_src: true
+        creates: "{{ mattermost_install_dir }}/{{ mattermost_version }}/mattermost/bin/mattermost"
+
+    - name: "Use mattermost {{ mattermost_version }}"
+      ansible.builtin.file:
+        src: "{{ mattermost_install_dir }}/{{ mattermost_version }}/mattermost"
+        dest: "{{ mattermost_install_dir }}/current"
+        state: link
+      notify:
+        - mattermost changed
+
+- name: Mattermost service
+  become: true
+  block:
+
+    - name: Instanciate mattermost environment file
+      ansible.builtin.template:
+        src: mattermost.env.j2
+        dest: "{{ mattermost_env_file }}"
+        mode: "u=rw,g=r,o=r"
+      notify:
+        - mattermost changed
+
+    - name: Instanciate mattermost systemd service file
+      ansible.builtin.template:
+        src: mattermost.service.j2
+        dest: /etc/systemd/system/mattermost.service
+        mode: "u=rw,g=r,o=r"
+      notify:
+        - mattermost changed
+
+    - name: Instanciate mattermost-import
+      ansible.builtin.template:
+        src: mattermost-import.j2
+        dest: /usr/local/sbin/mattermost-import
+        mode: "u=rwx,g=,o="
+
+    - name: Enable mattermost systemd service
+      ansible.builtin.systemd:
+        name: mattermost
+        enabled: true
+        state: started
+        daemon_reload: true
+
+- name: Instanciate caddy file
+  become: true
+  become_user: caddy
+  ansible.builtin.template:
+    src: mattermost.caddy.j2
+    dest: /etc/caddy/sites.d/mattermost.caddy
+    owner: caddy
+    group: caddy
+    mode: "u=rw,g=r,o=r"
+  notify:
+    - caddy changed
+
+- name: Setup backup
+  ansible.builtin.include_tasks:
+    file: backup.yml

@@ -1,0 +1,10 @@
+source_directories:
+    - /srv/mattermost
+
+# borgmatic runs as root, which has no PostgreSQL role: dump and restore as
+# postgres, through peer authentication
+postgresql_databases:
+    - name: mattermost
+      pg_dump_command: runuser -u postgres -- pg_dump
+      pg_restore_command: runuser -u postgres -- pg_restore
+      psql_command: runuser -u postgres -- psql

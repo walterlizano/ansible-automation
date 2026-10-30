@@ -12,6 +12,7 @@
     state: restarted
     enabled: true
   listen: vouchers changed
+  when: deployment_is_prod | bool
 
 - name: Enable vouchers.epicerieledetour.org systemd service
   become: true

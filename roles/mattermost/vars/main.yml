@@ -1,0 +1,4 @@
+---
+mattermost_domain: chat.batiment7.org
+mattermost_site_url: "{{ deployment_is_dev | ternary('https://chat.localhost', 'https://' ~ mattermost_domain) }}"
+mattermost_env_file: /etc/mattermost.env

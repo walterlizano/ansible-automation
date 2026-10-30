@@ -1,0 +1,18 @@
+---
+# Team Edition, not the enterprise build: since v11 an unlicensed enterprise
+# build runs as "Entry", which only shows the last 10,000 messages of the
+# whole server.
+mattermost_version: "12.0.0"
+mattermost_sha256: fcaa0a6c93772983079b5c6185287106a6c5e147b64386283ab7f8a14237a906
+
+# Started in turn by mattermost-import before mattermost_version, to migrate
+# the database of an older server one Extended Support Release at a time, as
+# Mattermost recommends.
+mattermost_import_steps:
+  - version: "10.11.24"
+    sha256: 1f9ad59cb422f67344e9aa78c9fe4fef4b3a4cc4ca3cc51fe7d711894fedb8e7
+  - version: "11.7.13"
+    sha256: 7384073008077dd1ea9ed3d0cf997c79529084f67d6bcfb14de531813de50d1b
+
+mattermost_install_dir: /opt/mattermost
+mattermost_root_dir: /srv/mattermost

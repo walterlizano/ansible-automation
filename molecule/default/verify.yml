@@ -35,3 +35,24 @@
         that: verify_failures | length == 0
         fail_msg: "Failing checks: {{ verify_failures }}"
         success_msg: "All web services verified"
+
+- name: Verify mattermost
+  hosts: mattermost
+  gather_facts: false
+  vars:
+    verify_failures: []
+  tasks:
+    - name: Wait for Caddy to accept HTTPS
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: 443
+        timeout: 60
+
+    - name: Verify mattermost
+      ansible.builtin.include_tasks: verify/mattermost.yml
+
+    - name: Report
+      ansible.builtin.assert:
+        that: verify_failures | length == 0
+        fail_msg: "Failing checks: {{ verify_failures }}"
+        success_msg: "Mattermost verified"

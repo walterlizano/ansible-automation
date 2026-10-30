@@ -1,9 +1,19 @@
 ---
-- name: "Add authorized key to ansible user {{ ansible_user }}"
+- name: "Add production authorized keys to ansible user {{ ansible_user }}"
+  ansible.posix.authorized_key:
+    user: "{{ ansible_user }}"
+    state: present
+    key: >-
+      {{ lookup('file',
+                playbook_dir ~ '/keys/' ~ item ~ '-id_ed25519.pub') }}
+  loop: "{{ authorized_keys_users }}"
+  when: deployment_is_prod | bool
+
+- name: "Add every key in keys/ to ansible user {{ ansible_user }}"
   ansible.posix.authorized_key:
     user: "{{ ansible_user }}"
     state: present
     key: "{{ lookup('file', item) }}"
   with_fileglob:
     - "{{ playbook_dir }}/keys/*"
-
+  when: deployment_is_dev | bool

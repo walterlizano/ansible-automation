@@ -1,0 +1,85 @@
+---
+- name: Mattermost
+  block:
+    - name: "Mattermost: plain HTTP"
+      ansible.builtin.uri:
+        url: http://chat.localhost/
+        follow_redirects: none
+      register: _mattermost_http
+      failed_when: false
+
+    - name: "Mattermost: plain HTTP redirects to HTTPS"
+      ansible.builtin.assert:
+        that:
+          - _mattermost_http.status == 308
+          - _mattermost_http.location | default('') is match('https://chat.localhost/')
+        fail_msg: >-
+          http://chat.localhost/ returned {{ _mattermost_http.status }}
+          to {{ _mattermost_http.location | default('nowhere') }}
+
+    # get_server_status also checks the database connection
+    - name: "Mattermost: server status"
+      ansible.builtin.uri:
+        url: https://chat.localhost/api/v4/system/ping?get_server_status=true
+        validate_certs: false
+        return_content: true
+      register: _mattermost_ping
+      failed_when: false
+      until: _mattermost_ping.status == 200
+      retries: 10
+      delay: 6
+
+    - name: "Mattermost: server and database are ok"
+      ansible.builtin.assert:
+        that:
+          - _mattermost_ping.status == 200
+          - (_mattermost_ping.content | from_json).status == 'OK'
+          - (_mattermost_ping.content | from_json).database_status == 'OK'
+        fail_msg: >-
+          https://chat.localhost/api/v4/system/ping returned {{ _mattermost_ping.status }}:
+          {{ _mattermost_ping.content | default('') | truncate(300) }}
+
+    - name: "Mattermost: version"
+      ansible.builtin.uri:
+        url: https://chat.localhost/api/v4/config/client?format=old
+        validate_certs: false
+        return_content: true
+      register: _mattermost_client_config
+      failed_when: false
+
+    - name: "Mattermost: runs the team edition of the expected version"
+      ansible.builtin.assert:
+        that:
+          - _mattermost_client_config.status == 200
+          - (_mattermost_client_config.content | from_json).Version is match('12\.0\.0')
+          - (_mattermost_client_config.content | from_json).BuildEnterpriseReady == 'false'
+          - (_mattermost_client_config.content | from_json).SiteURL == 'https://chat.localhost'
+        fail_msg: >-
+          https://chat.localhost/api/v4/config/client returned {{ _mattermost_client_config.status }}:
+          {{ _mattermost_client_config.content | default('') | truncate(300) }}
+
+    - name: "Mattermost: web app"
+      ansible.builtin.uri:
+        url: https://chat.localhost/login
+        validate_certs: false
+        return_content: true
+      register: _mattermost_login
+      failed_when: false
+
+    # The title is the site name: "Mattermost" on a new server, the old
+    # server's own after mattermost-import
+    - name: "Mattermost: web app is served"
+      ansible.builtin.assert:
+        that:
+          - _mattermost_login.status == 200
+          - >-
+            ('<title>' ~ (_mattermost_client_config.content | from_json).SiteName ~ '</title>')
+            in _mattermost_login.content
+        fail_msg: >-
+          https://chat.localhost/login returned {{ _mattermost_login.status }}:
+          {{ _mattermost_login.content | default('') | truncate(300) }}
+
+  rescue:
+    - name: "Mattermost: record failure"
+      ansible.builtin.set_fact:
+        verify_failures: "{{ verify_failures + ['mattermost: ' ~ ansible_failed_result.msg] }}"

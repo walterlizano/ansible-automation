@@ -1,5 +1,8 @@
 [server]
-http_addr = 127.0.0.1
+# Listen on all interfaces: the webservers' caddy reverse proxies grafana
+# through the wireguard network.
+# Not binding to the wireguard address only, as grafana may start before it's up.
+http_addr = 0.0.0.0
 {% if deployment_is_prod %}
 root_url = https://{{ grafana_url }}
 {% endif %}

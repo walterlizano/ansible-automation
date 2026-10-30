@@ -1,0 +1,38 @@
+---
+# Mounted by UUID rather than by device name, so that adding or removing a
+# drive cannot renumber /dev/sd* underneath us and mount the wrong disk.
+- name: Borg storage
+  become: true
+  when:
+    - deployment_is_prod
+    - borg_storage_uuid | length > 0
+  block:
+    - name: Check whether the borg storage is already mounted
+      ansible.builtin.command:
+        cmd: "findmnt --mountpoint {{ borg_storage_path }}"
+      register: borg_storage_findmnt
+      changed_when: false
+      failed_when: false
+
+    # Only ever touched while unmounted, otherwise this would chmod the live
+    # mount and lock borg out of its own repositories. Left unreadable so that
+    # a disk failing to mount makes borg fail loudly instead of quietly
+    # filling up the filesystem holding /srv.
+    - name: Create the borg storage mount point
+      ansible.builtin.file:
+        path: "{{ borg_storage_path }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "0000"
+      when: borg_storage_findmnt.rc != 0
+
+    - name: Mount the borg storage
+      ansible.posix.mount:
+        path: "{{ borg_storage_path }}"
+        src: "UUID={{ borg_storage_uuid }}"
+        fstype: "{{ borg_storage_fstype }}"
+        opts: "{{ borg_storage_opts }}"
+        dump: "0"
+        passno: "2"
+        state: mounted

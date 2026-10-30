@@ -13,9 +13,9 @@
     state: restarted
   listen: loki changed
 
-- name: Reload alloy
+- name: Reload prometheus
   become: true
   ansible.builtin.systemd:
-    name: alloy
+    name: prometheus
     state: restarted
-  listen: alloy changed
+  listen: prometheus changed

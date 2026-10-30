@@ -1,0 +1,13 @@
+---
+- name: Reload NetworkManager connections
+  become: true
+  ansible.builtin.command: nmcli connection reload
+  changed_when: true
+  listen: networkmanager connection changed
+
+- name: Bring wireguard connection wg-ledetour up
+  become: true
+  ansible.builtin.command: nmcli connection up wg-ledetour
+  changed_when: true
+  when: workstations_nm_autoconnect
+  listen: networkmanager connection changed

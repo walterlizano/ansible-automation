@@ -5,19 +5,10 @@
 
   # Dependencies
   
-  - name: Enable extrepo policies
-    ansible.builtin.lineinfile:
-      path: /etc/extrepo/config.yaml
-      regexp: "# - {{ item }}"
-      line: "- {{ item }}"
-    loop:
-      - contrib
-      - non-free
-
-  - name: Enable extrepo source uv
-    ansible.builtin.command: "extrepo enable uv"
+  - name: Enable extrepo source latest-debs
+    ansible.builtin.command: "extrepo enable latest-debs"
     args:
-      creates: "/etc/apt/sources.list.d/extrepo_uv.sources"
+      creates: "/etc/apt/sources.list.d/extrepo_latest-debs.sources"
 
   - name: Install vouchers dependencies
     ansible.builtin.apt:
@@ -55,6 +46,15 @@
       dest: /etc/systemd/system/
     notify:
       - vouchers changed
+
+  # The report emails the real recipients: never run it from a development VM
+  - name: Disable vouchers.epicerieledetour.org report timer in development
+    ansible.builtin.systemd:
+      name: ldt-vouchers-report.timer
+      state: stopped
+      enabled: false
+      daemon_reload: true
+    when: deployment_is_dev | bool
 
 
   # systemd: service

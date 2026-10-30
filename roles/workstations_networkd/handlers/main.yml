@@ -1,0 +1,18 @@
+---
+# networkctl reload doesn't reconfigure an existing netdev: delete the
+# interface first so that it is recreated with the new keys / peers
+- name: Delete wireguard interface wg-ledetour
+  become: true
+  ansible.builtin.command: networkctl delete wg-ledetour
+  register: workstations_networkd_delete
+  changed_when: workstations_networkd_delete.rc == 0
+  failed_when: false
+  listen: networkd netdev changed
+
+- name: Reload systemd-networkd
+  become: true
+  ansible.builtin.command: networkctl reload
+  changed_when: true
+  listen:
+    - networkd netdev changed
+    - networkd changed

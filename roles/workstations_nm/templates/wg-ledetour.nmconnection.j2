@@ -1,0 +1,25 @@
+# {{ ansible_managed }}
+[connection]
+id=wg-ledetour
+uuid={{ ('wg-ledetour-' ~ inventory_hostname) | to_uuid }}
+type=wireguard
+interface-name=wg-ledetour
+autoconnect={{ workstations_nm_autoconnect | lower }}
+
+[wireguard]
+private-key={{ wireguard_private_key }}
+
+{% for host in groups['all'] if hostvars[host].wireguard_type | default('') == "endpoint" %}
+# {{ host }}
+[wireguard-peer.{{ hostvars[host].wireguard_public_key }}]
+endpoint={{ hostvars[host].wireguard_endpoint_host }}:{{ hostvars[host].wireguard_endpoint_port }}
+allowed-ips={{ hostvars[host].wireguard_allowed_ips }};
+persistent-keepalive=25
+
+{% endfor %}
+[ipv4]
+method=manual
+address1={{ wireguard_address }}/32
+
+[ipv6]
+method=disabled

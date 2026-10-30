@@ -1,0 +1,115 @@
+#!/bin/bash
+# {{ ansible_managed }}
+#
+# Replace everything this mattermost holds by the data of another mattermost
+# server, typically the one this server replaces. Run as root:
+#
+#   mattermost-import <bundle folder>
+#
+# The bundle folder holds, copied from the other server:
+#   mattermost.pgdump   pg_dump --format=custom of its database
+#   config.json         its config.json
+#   data/               its FileSettings.Directory folder
+#
+# The other server can run mattermost 10.6 or newer, enterprise or team
+# edition. Its database is migrated by starting each version of
+# mattermost_import_steps in turn ({{ mattermost_import_steps | map(attribute='version') | join(', ') }}),
+# then the installed one ({{ mattermost_version }}).
+#
+# The settings of the other server's config.json are kept, except the ones
+# set by {{ mattermost_env_file }}.
+set -euo pipefail
+
+BUNDLE="$(realpath "${1:?usage: $0 <bundle folder>}")"
+ROOT={{ mattermost_root_dir }}
+INSTALL={{ mattermost_install_dir }}
+ENV_FILE={{ mattermost_env_file }}
+
+for f in mattermost.pgdump config.json data; do
+    test -e "$BUNDLE/$f" || { echo "missing $BUNDLE/$f" >&2; exit 1; }
+done
+
+# Start a mattermost version in the foreground until it answers, which means
+# its database migrations are done, then stop it
+migrate_with() {
+    local version="$1" sha256="$2"
+    local tarball="$INSTALL/mattermost-team-$version-linux-amd64.tar.gz"
+    local dir="$INSTALL/$version"
+
+    echo "### Migrating the database with mattermost $version"
+    if [ ! -x "$dir/mattermost/bin/mattermost" ]; then
+        curl -fsSL -o "$tarball" "https://releases.mattermost.com/$version/mattermost-team-$version-linux-amd64.tar.gz"
+        echo "$sha256  $tarball" | sha256sum --check --quiet
+        mkdir -p "$dir"
+        tar -C "$dir" -xzf "$tarball"
+        chown -R mattermost:mattermost "$tarball" "$dir"
+    fi
+
+    (
+        set -a
+        . "$ENV_FILE"
+        cd "$dir/mattermost"
+        exec setpriv --reuid=mattermost --regid=mattermost --init-groups ./bin/mattermost
+    ) > "$INSTALL/import-$version.log" 2>&1 &
+    local pid=$!
+
+    # Same 1 hour limit as mattermost.service's TimeoutStartSec
+    for _ in $(seq 360); do
+        if curl -fsS http://127.0.0.1:8065/api/v4/system/ping 2>/dev/null | grep -q '"status":"OK"'; then
+            break
+        fi
+        if ! kill -0 "$pid" 2>/dev/null; then
+            echo "mattermost $version stopped, see $INSTALL/import-$version.log" >&2
+            exit 1
+        fi
+        sleep 10
+    done
+    curl -fsS http://127.0.0.1:8065/api/v4/system/ping | grep -q '"status":"OK"'
+
+    # Let the migrations run as background jobs at startup finish
+    sleep 30
+    kill -TERM "$pid"
+    wait "$pid" || true
+}
+
+systemctl stop mattermost
+
+echo "### Database"
+runuser -u postgres -- dropdb --if-exists mattermost
+runuser -u postgres -- createdb --owner=mattermost --template=template0 --encoding=UTF8 mattermost
+# --role: mattermost owns every restored object, whatever the other server's
+# PostgreSQL user was
+runuser -u postgres -- pg_restore --exit-on-error --no-owner --no-privileges --role=mattermost --dbname=mattermost < "$BUNDLE/mattermost.pgdump"
+
+echo "### Files"
+find "$ROOT/data" -mindepth 1 -delete
+cp -a "$BUNDLE/data/." "$ROOT/data/"
+chown -R mattermost:mattermost "$ROOT/data"
+# cp -a also copied the bundle folder's own mode: back to the role's
+chmod u=rwx,g=rx,o= "$ROOT/data"
+
+echo "### Configuration"
+# The other server's database password has no use here: the database
+# connection comes from $ENV_FILE
+python3 - "$BUNDLE/config.json" "$ROOT/config/config.json" <<'EOF'
+import json, sys
+config = json.load(open(sys.argv[1]))
+config["SqlSettings"]["DataSource"] = ""
+json.dump(config, open(sys.argv[2], "w"), indent=2)
+EOF
+chown mattermost:mattermost "$ROOT/config/config.json"
+chmod u=rw,g=,o= "$ROOT/config/config.json"
+
+{% for step in mattermost_import_steps %}
+migrate_with {{ step.version }} {{ step.sha256 }}
+{% endfor %}
+
+echo "### Starting mattermost {{ mattermost_version }}"
+systemctl start mattermost
+curl -fsS http://127.0.0.1:8065/api/v4/system/ping | grep -q '"status":"OK"'
+
+runuser -u postgres -- psql --dbname=mattermost --no-align --tuples-only --command="
+    select 'active users: ' || count(*) from users where deleteat = 0
+    union all select 'posts: ' || count(*) from posts
+    union all select 'files: ' || count(*) from fileinfo"
+echo "### Done"

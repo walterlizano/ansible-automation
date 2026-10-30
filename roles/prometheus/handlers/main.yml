@@ -1,7 +1,0 @@
----
-- name: Reload prometheus
-  become: true
-  ansible.builtin.systemd:
-    name: prometheus
-    state: restarted
-  listen: prometheus changed

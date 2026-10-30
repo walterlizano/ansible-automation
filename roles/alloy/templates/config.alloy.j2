@@ -1,4 +1,5 @@
-// Ships local logs to Loki, replacing the (now EOL) Promtail agent.
+// Ships local logs to the Loki instance of the grafana host through the
+// wireguard network, replacing the (now EOL) Promtail agent.
 //
 // Note: the old promtail config also scraped /var/log/borg.log (with a JSON
 // pipeline stage pulling out duration/compressed_size/timestamp), but the
@@ -7,9 +8,9 @@
 
 local.file_match "logs" {
 	path_targets = [
-		{__path__ = "/var/log/ufw.log", job = "ufw"},
-		{__path__ = "/var/log/fail2ban.log", job = "fail2ban"},
-		{__path__ = "/var/log/auth.log", job = "ssh"},
+		{__path__ = "/var/log/ufw.log", job = "ufw", host = "{{ inventory_hostname }}"},
+		{__path__ = "/var/log/fail2ban.log", job = "fail2ban", host = "{{ inventory_hostname }}"},
+		{__path__ = "/var/log/auth.log", job = "ssh", host = "{{ inventory_hostname }}"},
 	]
 }
 
@@ -20,6 +21,6 @@ loki.source.file "logs" {
 
 loki.write "default" {
 	endpoint {
-		url = "http://localhost:3100/loki/api/v1/push"
+		url = "http://{{ hostvars[groups['grafana'] | first].wireguard_address }}:3100/loki/api/v1/push"
 	}
 }

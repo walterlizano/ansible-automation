@@ -1,0 +1,15 @@
+---
+- name: Fail2ban
+  become: true
+  block:
+    - name: Install fail2ban
+      ansible.builtin.apt:
+        name: fail2ban
+
+    - name: Never ban the trusted networks
+      ansible.builtin.template:
+        src: 00-ldt-ignoreip.conf.j2
+        dest: /etc/fail2ban/jail.d/00-ldt-ignoreip.conf
+        mode: "0644"
+      notify:
+        - fail2ban changed
