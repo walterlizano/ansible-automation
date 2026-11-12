@@ -9,3 +9,16 @@ deployment_suffix: "{{ '-dev' if deployment_is_dev | bool else '-prod' }}"
 # the webservers, grafana on the grafana hosts).
 google_auth_client_id: 666389311813-bkam02fjjruohg1hb6qt4mc61qf6rhn6.apps.googleusercontent.com
 google_auth_client_secret: "{{ vault_google_auth_client_secret }}"
+
+# Notifications go to two Slack webhooks: alerts that need someone to
+# act to the #comité-informatique channel, information such as backup reports
+# to #comité-informatique-bots. Every sender (grafana, borgmatic...) uses one
+# of these two URLs.
+#
+# In development they go to the alert_sink role's HTTP server on the grafana
+# host instead, which records them under a path naming the channel. Nothing
+# reaches Slack from a Molecule VM.
+alert_sink_port: 8181
+alert_sink_url: "http://{{ hostvars[groups['grafana'] | first].wireguard_address }}:{{ alert_sink_port }}"
+alerts_webhook_url: "{{ deployment_is_dev | ternary(alert_sink_url ~ '/comite-informatique', vault_slack_alerts_webhook_url) }}"
+info_webhook_url: "{{ deployment_is_dev | ternary(alert_sink_url ~ '/comite-informatique-bots', vault_slack_info_webhook_url) }}"

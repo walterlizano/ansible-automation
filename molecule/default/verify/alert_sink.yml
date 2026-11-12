@@ -1,0 +1,45 @@
+---
+# Checked from the grafana host, where the alert sink stands in for Slack in
+# development: it answers like Slack and records what it receives.
+- name: Alert sink
+  vars:
+    _sink: "http://localhost:{{ alert_sink_port }}"
+  block:
+    - name: "Alert sink: post to the sink"
+      ansible.builtin.uri:
+        url: "{{ _sink }}/molecule-verify"
+        method: POST
+        body_format: json
+        body:
+          text: molecule verify ping
+        return_content: true
+      register: _alert_sink_post
+      failed_when: false
+      until: _alert_sink_post.status == 200
+      retries: 5
+      delay: 2
+
+    - name: "Alert sink: the sink answers like Slack"
+      ansible.builtin.assert:
+        that:
+          - _alert_sink_post.status == 200
+          - _alert_sink_post.content == 'ok'
+        fail_msg: >-
+          POST {{ _sink }}/molecule-verify returned {{ _alert_sink_post.status }}:
+          {{ _alert_sink_post.content | default('') | truncate(300) }}
+
+    - name: "Alert sink: read the sink"
+      ansible.builtin.uri:
+        url: "{{ _sink }}/"
+        return_content: true
+      register: _alert_sink_log
+
+    - name: "Alert sink: the sink recorded the post"
+      ansible.builtin.assert:
+        that: "'molecule verify ping' in _alert_sink_log.content"
+        fail_msg: "{{ _sink }}/ doesn't list the post"
+
+  rescue:
+    - name: "Alert sink: record failure"
+      ansible.builtin.set_fact:
+        verify_failures: "{{ verify_failures + ['alert_sink: ' ~ ansible_failed_result.msg] }}"

@@ -178,6 +178,49 @@ Drives at 01:00 and all machines run their backups at 04:00, Montreal time.
 Workstation plays are tagged `never` and run only when explicitly asked for, see
 [Wireguard on workstations](#wireguard-on-workstations).
 
+### Notifications
+
+The servers report to two Slack channels of the
+[epicerieledetour](https://epicerieledetour.slack.com) workspace, through one
+incoming webhook each:
+
+| channel | what goes there | meant for |
+|---|---|---|
+| `#comité-informatique` | alerts that need someone to act, e.g. a server down for 5 minutes | Grafana's alert rules |
+| `#comité-informatique-bots` | information, e.g. a backup done, or failed | borgmatic on every backup source |
+
+The webhook URLs are vault-encrypted in `group_vars/all/vault.yml` as
+`vault_slack_alerts_webhook_url` and `vault_slack_info_webhook_url`, and
+`group_vars/all/vars.yml` exposes them as `alerts_webhook_url` and
+`info_webhook_url`: every sender uses one of these two variables. **No
+sender is configured yet, and until the Slack webhooks are created, both
+variables hold placeholders.**
+
+On a Molecule/dev environment nothing reaches Slack: both URLs
+point at the `alert_sink` role's HTTP server on the grafana host, which
+records every call under a path naming the channel. See
+[Alerting](#alerting) below to read what it received.
+
+#### Creating or replacing a webhook
+
+1. In Slack, open <https://api.slack.com/apps> and create an app (from
+   scratch) for the workspace, or open the existing one. Under *Incoming
+   Webhooks*, activate them, then *Add New Webhook to Workspace* and pick the
+   channel. Copy the `https://hooks.slack.com/services/...` URL. Repeat for
+   the other channel: a webhook is bound to one channel.
+2. Put the URLs in the vault:
+
+   ```bash
+   $ ansible-vault edit group_vars/all/vault.yml
+   ```
+
+   and set `vault_slack_alerts_webhook_url` for `#comité-informatique` and
+   `vault_slack_info_webhook_url` for `#comité-informatique-bots`. The vault
+   password is read from `vault_password.sh`, see
+   [The vault password file](#the-vault-password-file).
+3. Deploy the roles that embed the URLs, with `ansible-playbook playbook.yml
+   --tags <role>`, and check with a test notification from each sender.
+
 `kiosk1` holds a `host_vars` entry, and therefore the reserved Wireguard address
 `.80`, without being part of the active inventory yet.
 
@@ -387,7 +430,7 @@ $ uv run molecule converge
 $ uv run molecule verify
 ```
 
-`molecule/default/verify.yml` checks wordpress, vouchers, membres, grafana and mattermost, and lists every failing check at the end.
+`molecule/default/verify.yml` checks wordpress, vouchers, membres, grafana, mattermost and the alert sink, and lists every failing check at the end.
 
 The sections below describe how to test the services by hand, for instance to investigate a failure.
 
@@ -468,4 +511,23 @@ $ curl -kL https://grafana.localhost
 ```
 
 On a Molecule/dev environment, Google OAuth is disabled, so login falls back to Grafana's built-in default account: username `admin`, password `admin` (Grafana forces a password change on first login). In production, Grafana is only reachable through Google OAuth (see `roles/grafana/templates/grafana.ini.j2`) — users log in with their `@epicerieledetour.org` Google account, and there is no separate local admin login.
+
+#### Alerting
+
+On a Molecule/dev environment, the [notifications](#notifications) meant for
+Slack go to the alert sink on the grafana VM (`srv1`), which records each call
+as one JSON line and lists them on GET:
+
+```bash
+$ uv run molecule login --host srv1
+srv1$ curl -s http://localhost:8181/ | jq '{time, path, title: .json.title, text: .json.text}'
+```
+
+Entries under `/comite-informatique` are alerts, those under
+`/comite-informatique-bots` information, see [Notifications](#notifications).
+Anything speaking to a Slack webhook can be pointed at it, for instance:
+
+```bash
+srv1$ curl -d '{"text": "hello"}' http://localhost:8181/comite-informatique
+```
 

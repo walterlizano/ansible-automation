@@ -87,6 +87,10 @@
   hosts: grafana
   roles:
     - role: systemd_handlers
+    # Development only: stands in for Slack, see group_vars/all/vars.yml
+    - role: alert_sink
+      tags: ["alert_sink"]
+      when: deployment_is_dev | bool
     - role: grafana
       tags: ["grafana"]
   tags: ["grafana"]

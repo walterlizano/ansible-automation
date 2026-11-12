@@ -1,0 +1,39 @@
+---
+# Development only: a tiny HTTP server standing in for the Slack incoming
+# webhooks. Grafana and borgmatic post their notifications to it instead of
+# Slack, see alerts_webhook_url and info_webhook_url in group_vars/all/vars.yml.
+# Read what it received with: curl http://<grafana host>:{{ alert_sink_port }}/
+- name: Alert sink
+  become: true
+  block:
+    - name: Install the alert sink
+      ansible.builtin.copy:
+        src: alert-sink.py
+        dest: /usr/local/bin/alert-sink
+        mode: "0755"
+      notify: alert sink changed
+
+    - name: Instanciate the alert sink systemd service
+      ansible.builtin.template:
+        src: alert-sink.service.j2
+        dest: /etc/systemd/system/alert-sink.service
+        mode: "0644"
+      notify:
+        - systemd changed
+        - alert sink changed
+
+    - name: Force handlers to run immediately
+      ansible.builtin.meta: flush_handlers
+
+    - name: Start the alert sink
+      ansible.builtin.systemd:
+        name: alert-sink
+        enabled: true
+        state: started
+
+    - name: Open the alert sink port on the wireguard network
+      community.general.ufw:
+        rule: allow
+        port: "{{ alert_sink_port }}"
+        proto: tcp
+        from_ip: 192.168.211.0/24

@@ -6,6 +6,16 @@
 # Each verify/<service>.yml records its failure in verify_failures instead of
 # aborting, so a single run reports every broken service.
 
+# The group_vars linked into Molecule's inventory default to production: the
+# webhook URLs would resolve to the real Slack ones. Mirrors converge.yml.
+- name: Setup dev environment
+  hosts: all
+  gather_facts: false
+  tasks:
+    - name: "Set deployment_is_dev to true"
+      ansible.builtin.set_fact:
+        deployment_is_dev: true
+
 - name: Verify data proxies
   hosts: dataproxies
   gather_facts: false
@@ -71,3 +81,18 @@
         that: verify_failures | length == 0
         fail_msg: "Failing checks: {{ verify_failures }}"
         success_msg: "Mattermost verified"
+
+- name: Verify the alert sink
+  hosts: grafana
+  gather_facts: false
+  vars:
+    verify_failures: []
+  tasks:
+    - name: Verify the alert sink
+      ansible.builtin.include_tasks: verify/alert_sink.yml
+
+    - name: Report
+      ansible.builtin.assert:
+        that: verify_failures | length == 0
+        fail_msg: "Failing checks: {{ verify_failures }}"
+        success_msg: "Alert sink verified"

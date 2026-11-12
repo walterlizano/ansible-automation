@@ -1,0 +1,14 @@
+[Unit]
+Description=Development stand-in for the Slack webhooks, recording every call
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/alert-sink
+Environment=ALERT_SINK_PORT={{ alert_sink_port }}
+Environment=ALERT_SINK_LOG=/var/lib/alert-sink/requests.jsonl
+DynamicUser=yes
+StateDirectory=alert-sink
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

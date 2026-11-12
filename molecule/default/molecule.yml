@@ -47,6 +47,9 @@ provisioner:
   inventory:
     links:
       hosts: "${MOLECULE_PROJECT_DIRECTORY}/inventory/groups.yml"
+      # Loaded through the root playbook on converge, but verify.yml lives in
+      # molecule/default and only sees inventory variables
+      group_vars: "${MOLECULE_PROJECT_DIRECTORY}/group_vars"
 
 verifier:
   name: ansible

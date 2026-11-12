@@ -1,0 +1,7 @@
+---
+- name: Restart the alert sink
+  become: true
+  ansible.builtin.systemd:
+    name: alert-sink
+    state: restarted
+  listen: alert sink changed
