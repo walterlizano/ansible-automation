@@ -4,3 +4,5 @@ borgmatic_snippets_dir: "{{ borgmatic_etc_dir }}/snippets"
 borgmatic_snippets_common: "{{ borgmatic_snippets_dir }}/common.yaml"
 borgmatic_ssh_dir: "{{ borgmatic_etc_dir }}/ssh"
 borgmatic_ssh_id: "{{ borgmatic_ssh_dir }}/id"
+borgmatic_slack_webhook_env_file: /etc/borgmatic.d/slack-notification.env
+

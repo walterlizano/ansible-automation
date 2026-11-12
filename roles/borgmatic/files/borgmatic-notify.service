@@ -1,0 +1,7 @@
+[Unit]
+Description=Send a Slack notification after a successful Borgmatic run
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/borgmatic.d/slack-notification.env
+ExecStart=/usr/local/sbin/notify-borg-backup

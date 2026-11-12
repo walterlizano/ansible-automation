@@ -29,6 +29,47 @@
         pkg:
           - borgmatic
 
+    - name: Install Borg backup Slack notification sender
+      ansible.builtin.copy:
+        src: notify-borg-backup.py
+        dest: /usr/local/sbin/notify-borg-backup
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Configure the Slack webhook for Borg notifications
+      ansible.builtin.template:
+        src: slack-notification.env.j2
+        dest: "{{ borgmatic_slack_webhook_env_file }}"
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+
+    - name: Install the successful Borg backup notification service
+      ansible.builtin.copy:
+        src: borgmatic-notify.service
+        dest: /etc/systemd/system/borgmatic-notify.service
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Create Borgmatic service drop-in directory
+      ansible.builtin.file:
+        path: /etc/systemd/system/borgmatic.service.d
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Notify Slack after a successful scheduled Borgmatic run
+      ansible.builtin.copy:
+        src: borgmatic-notification.conf
+        dest: /etc/systemd/system/borgmatic.service.d/notification.conf
+        owner: root
+        group: root
+        mode: "0644"
+
     - name: Make borgmatic timer drop-in directory
       ansible.builtin.file:
         path: /etc/systemd/system/borgmatic.timer.d
