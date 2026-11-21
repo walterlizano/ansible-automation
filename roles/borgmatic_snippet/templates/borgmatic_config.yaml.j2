@@ -9,6 +9,6 @@ repositories:
 {% endfor %}
 
 after_backup:
-    - /usr/local/sbin/borg-repository-metrics success {repository}
+    - /usr/local/sbin/borg-repository-metrics.py success {repository}
 on_error:
-    - /usr/local/sbin/borg-repository-metrics failure {repository}
+    - /usr/local/sbin/borg-repository-metrics.py failure {repository}

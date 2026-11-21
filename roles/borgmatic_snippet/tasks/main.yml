@@ -39,7 +39,7 @@
 
     - name: Initialize Borg repository metrics after updating hook targets
       ansible.builtin.command:
-        cmd: /usr/local/sbin/borg-repository-metrics initialize
+        cmd: /usr/local/sbin/borg-repository-metrics.py initialize
       changed_when: false
 
     - name: Initialize repositories

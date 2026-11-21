@@ -3,4 +3,4 @@ Description=Update the last successful APT upgrade metric
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/sbin/apt-upgrade-metrics
+ExecStart=/usr/local/sbin/apt-upgrade-metrics.py
